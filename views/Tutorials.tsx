@@ -43,8 +43,8 @@ const Tutorials: React.FC = () => {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-3xl font-bold text-on-surface mb-2">Beginner's Guide</h1>
-        <p className="text-on-surface-secondary">Learn how to get started with JPYC and DeFi.</p>
+        <h1 className="text-3xl font-bold text-on-surface mb-2">はじめてのガイド</h1>
+        <p className="text-on-surface-secondary">JPYC や DeFi を始める手順をステップ形式で学べます。</p>
       </section>
 
       {TUTORIALS.map(section => (

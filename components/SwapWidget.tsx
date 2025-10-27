@@ -20,14 +20,15 @@ const SwapWidget: React.FC = () => {
   };
 
   return (
-    <Card className="max-w-md mx-auto">
-      <h3 className="text-lg font-semibold text-on-surface mb-4">Swap Tokens</h3>
+    <Card className="max-w-md mx-auto relative overflow-hidden">
+      <div className="opacity-50 blur-sm pointer-events-none select-none">
+      <h3 className="text-lg font-semibold text-on-surface mb-4">トークンをスワップ</h3>
       <div className="space-y-4">
         {/* From Token */}
         <div className="bg-background p-4 rounded-lg">
           <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-on-surface-secondary">From</span>
-            <span className="text-xs text-on-surface-secondary">Balance: 1,234.56</span>
+            <span className="text-xs text-on-surface-secondary">送信元</span>
+            <span className="text-xs text-on-surface-secondary">残高: 1,234.56</span>
           </div>
           <div className="flex justify-between items-center">
             <input 
@@ -54,8 +55,8 @@ const SwapWidget: React.FC = () => {
         {/* To Token */}
         <div className="bg-background p-4 rounded-lg">
           <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-on-surface-secondary">To</span>
-            <span className="text-xs text-on-surface-secondary">Balance: 789.01</span>
+            <span className="text-xs text-on-surface-secondary">受取先</span>
+            <span className="text-xs text-on-surface-secondary">残高: 789.01</span>
           </div>
           <div className="flex justify-between items-center">
             <input 
@@ -75,18 +76,24 @@ const SwapWidget: React.FC = () => {
 
       <div className="text-xs text-on-surface-secondary mt-4 space-y-1">
         <div className="flex justify-between">
-            <span>Price:</span>
+            <span>価格:</span>
             <span>1 JPYC ≈ 0.9985 USDC</span>
         </div>
         <div className="flex justify-between">
-            <span>Slippage Tolerance:</span>
+            <span>許容スリッページ:</span>
             <span>0.5%</span>
         </div>
       </div>
 
       <button className="w-full bg-primary text-white font-bold py-3 rounded-lg mt-6 hover:bg-primary-hover transition-colors">
-        Connect Wallet
+        ウォレットを接続
       </button>
+      </div>
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="rounded-full bg-slate-900/70 px-6 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">
+          Comming Soon
+        </div>
+      </div>
     </Card>
   );
 };

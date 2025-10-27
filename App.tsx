@@ -5,6 +5,7 @@ import Analytics from './views/Analytics';
 import Ecosystem from './views/Ecosystem';
 import Tutorials from './views/Tutorials';
 import Community from './views/Community';
+import Security from './views/Security';
 import { type Tab } from './types';
 
 const App: React.FC = () => {
@@ -16,12 +17,14 @@ const App: React.FC = () => {
         return <Home />;
       case '分析':
         return <Analytics />;
-      case 'DeFiエコシステム':
+      case 'エコシステム':
         return <Ecosystem />;
       case 'チュートリアル':
         return <Tutorials />;
       case 'コミュニティ':
         return <Community />;
+      case 'セキュリティ':
+        return <Security />;
       default:
         return <Home />;
     }

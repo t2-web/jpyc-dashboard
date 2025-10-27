@@ -1,33 +1,40 @@
-import React, { useState } from 'react';
+import React from 'react';
 import Card from '../components/Card';
 import StatCard from '../components/DataCard';
 import HeroBackground from '../components/HeroBackground';
 import { PlayIcon } from '../components/icons';
-import { ANNOUNCEMENTS, JPYC_PRICE_JPY, JPYC_PRICE_USD, TOTAL_SUPPLY_BILLIONS, TOTAL_SUPPLY_FORMATTED, TOTAL_HOLDERS, OPERATION_WALLET } from '../constants';
+import { ANNOUNCEMENTS } from '../constants';
+import { PRICE_PLACEHOLDER, useJpycOnChainData } from '../hooks/useJpycOnChainData';
 
 const Home: React.FC = () => {
-    const [currency, setCurrency] = useState<'JPY' | 'USD'>('JPY');
+    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount } = useJpycOnChainData();
+
+    const supplyShort = isLoading ? '読み込み中…' : totalSupplyBillions ? `¥${totalSupplyBillions}B` : '—';
+    const supplyFull = isLoading ? '読み込み中…' : totalSupplyFormatted ? `${totalSupplyFormatted} JPYC` : '—';
+    const holdersLabel = isLoading ? '読み込み中…' : 'Comming Soon';
 
     return (
         <div>
             {/* Hero Section */}
-            <section className="relative overflow-hidden bg-white text-on-surface text-center py-20 md:py-32">
+            <section className="relative overflow-hidden bg-slate-950 text-center text-white py-20 md:py-32">
                 <HeroBackground />
                 <div className="relative max-w-4xl mx-auto px-4">
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-                        <span className="block">日本円ステーブルコイン</span>
-                        <span className="block text-primary mt-2">JPYC</span>
-                    </h1>
-                    <p className="mt-6 max-w-2xl mx-auto text-lg text-on-surface-secondary">
-                        安心して理解し、使えるデジタル円。透明性の高い運営と豊富なDeFiエコシステムで、新しい金融体験を提供します。
-                    </p>
-                    <div className="mt-8 flex justify-center gap-4">
-                        <button className="px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-primary-hover transition-colors">
-                            はじめる
-                        </button>
-                        <button className="px-8 py-3 bg-white text-on-surface font-semibold rounded-lg border border-border hover:bg-secondary transition-colors">
-                            詳細を見る
-                        </button>
+                    <div className="mx-auto max-w-3xl rounded-3xl bg-slate-950/40 backdrop-blur-sm border border-white/10 p-8 md:p-12 shadow-2xl">
+                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                            <span className="block text-white">日本円ステーブルコイン</span>
+                            <span className="block text-primary mt-2">JPYC</span>
+                        </h1>
+                        <p className="mt-6 max-w-2xl mx-auto text-lg text-white/85">
+                            安心して理解し、使えるデジタル円。透明性の高い運営と豊富なDeFiエコシステムで、新しい金融体験を提供します。
+                        </p>
+                        <div className="mt-10 flex flex-col sm:flex-row sm:justify-center gap-4">
+                            <button className="px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-primary-hover transition-colors">
+                                はじめる
+                            </button>
+                            <button className="px-8 py-3 bg-white/90 text-slate-900 font-semibold rounded-lg border border-white/40 hover:bg-white transition-colors">
+                                詳細を見る
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -35,34 +42,22 @@ const Home: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Stats Section */}
                 <section className="-mt-16 relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <StatCard title="現在価格">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-3xl font-bold">
-                                        {currency === 'JPY' ? `¥${JPYC_PRICE_JPY.toFixed(2)}` : `$${JPYC_PRICE_USD.toFixed(4)}`}
-                                    </p>
-                                    <p className="text-sm text-green-500 mt-1">+0.02% (24h)</p>
-                                </div>
-                                <div className="flex bg-secondary rounded-lg p-1 text-xs">
-                                    <button onClick={() => setCurrency('JPY')} className={`px-2 py-1 rounded ${currency === 'JPY' ? 'bg-white shadow-sm' : ''}`}>JPY</button>
-                                    <button onClick={() => setCurrency('USD')} className={`px-2 py-1 rounded ${currency === 'USD' ? 'bg-white shadow-sm' : ''}`}>USD</button>
-                                </div>
+                            <div className="flex flex-col items-start">
+                                <p className="text-3xl font-bold tracking-tight">{PRICE_PLACEHOLDER}</p>
+                                <p className="text-sm text-on-surface-secondary mt-1">オンチェーン価格連携を準備中です</p>
                             </div>
                         </StatCard>
                         <StatCard title="総供給量">
-                             <p className="text-3xl font-bold">¥{TOTAL_SUPPLY_BILLIONS.toFixed(1)}B</p>
-                             <p className="text-sm text-on-surface-secondary mt-1">{TOTAL_SUPPLY_FORMATTED} JPYC</p>
+                             <p className="text-3xl font-bold">{supplyShort}</p>
+                             <p className="text-sm text-on-surface-secondary mt-1">{supplyFull}</p>
+                             {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
                         </StatCard>
                         <StatCard title="保有者数">
-                            <p className="text-3xl font-bold">{TOTAL_HOLDERS}</p>
-                            <p className="text-sm text-green-500 mt-1">+127 (今週)</p>
+                            <p className="text-3xl font-bold">{holdersLabel}</p>
+                            <p className="text-sm text-on-surface-secondary mt-1">オンチェーン保有者カウントは準備中です</p>
                         </StatCard>
-                        <Card>
-                             <h3 className="text-sm font-medium text-on-surface-secondary mb-2">運営ウォレット</h3>
-                             <p className="font-mono text-sm break-all">{OPERATION_WALLET}</p>
-                             <a href="#" className="text-sm text-primary hover:underline mt-1 block">Etherscan で確認</a>
-                        </Card>
                     </div>
                 </section>
 
@@ -86,16 +81,23 @@ const Home: React.FC = () => {
                         {/* Getting Started */}
                         <div>
                              <h2 className="text-2xl font-bold mb-6">はじめての JPYC</h2>
-                             <Card>
-                                <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center">
-                                    <PlayIcon />
+                             <Card className="relative overflow-hidden">
+                                <div className="opacity-50 blur-sm select-none pointer-events-none">
+                                    <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center">
+                                        <PlayIcon />
+                                    </div>
+                                    <p className="text-on-surface-secondary my-4">
+                                        JPYC の基本的な使い方から DeFi での活用方法まで、わかりやすく解説します。
+                                    </p>
+                                    <button className="w-full bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-hover transition-colors">
+                                        チュートリアルを見る
+                                    </button>
                                 </div>
-                                <p className="text-on-surface-secondary my-4">
-                                    JPYC の基本的な使い方から DeFi での活用方法まで、わかりやすく解説します。
-                                </p>
-                                <button className="w-full bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-hover transition-colors">
-                                    チュートリアルを見る
-                                </button>
+                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                    <div className="rounded-full bg-slate-900/70 px-6 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">
+                                        Comming Soon
+                                    </div>
+                                </div>
                              </Card>
                         </div>
                     </div>
