@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_ETHERSCAN_API_KEY?: string;
   readonly VITE_POLYGONSCAN_API_KEY?: string;
   readonly VITE_SNOWTRACE_API_KEY?: string;
+  readonly VITE_BLACKLIST_ADDRESSES?: string;
 }
 
 interface ImportMeta {

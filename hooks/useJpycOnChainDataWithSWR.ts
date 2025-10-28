@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { CacheManager } from '../lib/CacheManager';
 import { CONTRACT_ADDRESSES, HOLDER_ACCOUNTS, MORALIS_CHAIN_IDS, SCAN_API_CONFIG } from '../constants';
 import {
   callErc20Balance,
@@ -11,6 +12,9 @@ import {
   hexToBigInt,
 } from '../lib/onchain';
 import { type HolderAccount, type SupportedChain } from '../types';
+import { loadBlacklistAddresses } from '../lib/blacklist';
+import { filterBlacklistedHolders } from '../lib/holderFilter';
+import { calculateBlacklistedSupply, calculateCirculatingSupply } from '../lib/supplyCalculation';
 
 type HolderSnapshot = HolderAccount & {
   balanceRaw: bigint;
@@ -20,6 +24,7 @@ type HolderSnapshot = HolderAccount & {
 
 type OnChainState = {
   isLoading: boolean;
+  isStale?: boolean;
   error?: string;
   totalSupplyRaw?: bigint;
   totalSupplyFormatted?: string;
@@ -28,10 +33,15 @@ type OnChainState = {
   holders: HolderSnapshot[];
   holdersCount?: number;
   holdersChange?: number;
+  blacklistedSupply?: bigint;
+  circulatingSupply?: bigint;
+  refresh?: () => void;
 };
 
-let cachedState: OnChainState | null = null;
-let inflightPromise: Promise<OnChainState> | null = null;
+const CACHE_KEY = 'jpyc-onchain-data';
+const CACHE_TTL = 30 * 60 * 1000; // 30分
+
+const cacheManager = new CacheManager();
 
 const MORALIS_API_KEY = import.meta.env.VITE_MORALIS_API_KEY;
 
@@ -56,18 +66,10 @@ function parseNumber(value: unknown): number | undefined {
 }
 
 async function fetchScanHolderCount(chain: SupportedChain, address: string): Promise<number | undefined> {
-  console.log(`🔍 [Scan API] Attempting to fetch holder count for ${chain}`);
   const config = SCAN_API_CONFIG[chain];
-  if (!config) {
-    console.warn(`⚠️ [Scan API] No config found for ${chain}`);
-    return undefined;
-  }
+  if (!config) return undefined;
   const apiKey = import.meta.env[config.envKey as keyof ImportMetaEnv];
-  if (!apiKey) {
-    console.warn(`⚠️ [Scan API] No API key found for ${chain} (${config.envKey})`);
-    return undefined;
-  }
-  console.log(`✅ [Scan API] Config and API key found for ${chain}, fetching...`);
+  if (!apiKey) return undefined;
 
   const url = new URL(config.baseUrl);
   url.searchParams.set('module', 'token');
@@ -85,11 +87,9 @@ async function fetchScanHolderCount(chain: SupportedChain, address: string): Pro
       throw new Error(`${response.status} ${response.statusText}`);
     }
     const data: { status?: string; message?: string; result?: string } = await response.json();
-    console.log(`🔍 [Scan API] ${chain} Response:`, data);
     if (data.status === '1' && data.result) {
       const parsed = Number(data.result);
       if (Number.isFinite(parsed)) {
-        console.log(`✅ [Scan API] ${chain} Holder Count:`, parsed);
         return parsed;
       }
     } else if (data.message) {
@@ -103,7 +103,6 @@ async function fetchScanHolderCount(chain: SupportedChain, address: string): Pro
 }
 
 async function fetchHolderSummary(): Promise<{ count?: number; change?: number }> {
-  console.log('📊 [Holder Summary] Starting holder count fetch...');
   const uniqueContracts = new Map<SupportedChain, typeof CONTRACT_ADDRESSES[number]>();
   for (const contract of CONTRACT_ADDRESSES) {
     const chainKey = contract.chain as SupportedChain;
@@ -111,24 +110,15 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
       uniqueContracts.set(chainKey, contract);
     }
   }
-  console.log('📊 [Holder Summary] Unique chains:', Array.from(uniqueContracts.keys()));
 
   const requests = Array.from(uniqueContracts.entries()).map(async ([chainKey, contract]) => {
-    console.log(`📊 [Holder Summary] Processing ${chainKey}...`);
     if (chainKey === 'Polygon') {
-      console.log('🔍 [Holder Summary] Using Scan API for Polygon');
       const polygonCount = await fetchScanHolderCount(chainKey, contract.address);
       return { count: polygonCount, change: undefined };
     }
 
     const chainId = MORALIS_CHAIN_IDS[chainKey];
-    console.log(`🔍 [Holder Summary] Using Moralis API for ${chainKey} (chainId: ${chainId})`);
-    if (!chainId) {
-      console.warn(`⚠️ [Moralis API] No chain ID found for ${chainKey}`);
-      return { count: undefined, change: undefined };
-    }
-    if (!MORALIS_API_KEY) {
-      console.warn(`⚠️ [Moralis API] No API key found (VITE_MORALIS_API_KEY)`);
+    if (!chainId || !MORALIS_API_KEY) {
       return { count: undefined, change: undefined };
     }
 
@@ -164,10 +154,7 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
       }
 
       const data: MoralisHolderResponse = await response.json();
-      console.log(`🔍 [Moralis API] ${chainKey} Response:`, data);
-
       const total =
-        parseNumber((data as any).totalHolders) ??
         parseNumber(data.total) ??
         parseNumber(data.page_total) ??
         parseNumber(data.pagination?.total) ??
@@ -175,15 +162,12 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
         parseNumber(data.summary?.total_holders);
 
       let change =
-        parseNumber((data as any).totalHoldersChange24h) ??
-        parseNumber((data as any).totalHoldersChange) ??
         parseNumber(data.total_change_24h) ??
         parseNumber(data.summary?.total_change_24h) ??
         parseNumber(data.summary?.total_holders_change_24h);
 
       if (change === undefined) {
         const previousTotal =
-          parseNumber((data as any).totalHolders24h) ??
           parseNumber(data.total_24h) ??
           parseNumber(data.summary?.total_24h) ??
           parseNumber(data.summary?.total_holders_24h);
@@ -191,8 +175,6 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
           change = total - previousTotal;
         }
       }
-
-      console.log(`✅ [Moralis API] ${chainKey} Parsed:`, { count: total, change });
 
       return {
         count: total,
@@ -205,8 +187,6 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
   });
 
   const results = await Promise.all(requests);
-  console.log('📊 [Holder Summary] All Chain Results:', results);
-
   let countTotal = 0;
   let changeTotal = 0;
   let hasCount = false;
@@ -223,136 +203,177 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
     }
   }
 
-  const summary = {
+  return {
     count: hasCount ? Math.round(countTotal) : undefined,
     change: hasChange && MORALIS_API_KEY ? Math.round(changeTotal) : undefined,
   };
-
-  console.log('✅ [Holder Summary] Final:', summary);
-
-  return summary;
 }
 
 async function fetchOnChainState(): Promise<OnChainState> {
-  if (cachedState) {
-    return cachedState;
-  }
-  if (inflightPromise) {
-    return inflightPromise;
-  }
-
-  inflightPromise = (async () => {
-    try {
-      const ethereumContract = CONTRACT_ADDRESSES.find((c) => c.chain === 'Ethereum');
-      if (!ethereumContract) {
-        throw new Error('Ethereum の公式コントラクト情報が見つかりません');
-      }
-
-      const [totalSupplyHex, decimals, moralisSummary] = await Promise.all([
-        callErc20TotalSupply('Ethereum', ethereumContract.address),
-        callErc20Decimals('Ethereum', ethereumContract.address),
-        fetchHolderSummary(),
-      ]);
-      const totalSupplyRaw = hexToBigInt(totalSupplyHex);
-      const totalSupplyFormatted = formatTokenAmount(totalSupplyRaw, decimals, 2);
-      const totalSupplyBillions = formatBillions(totalSupplyRaw, decimals);
-
-      // 実際の値をログ出力
-      console.log('📊 [OnChain Data] Total Supply:', {
-        raw: totalSupplyRaw.toString(),
-        formatted: totalSupplyFormatted,
-        billions: totalSupplyBillions,
-        decimals,
-      });
-      console.log('👥 [OnChain Data] Holders:', {
-        count: moralisSummary.count,
-        change: moralisSummary.change,
-      });
-
-      const holders = await Promise.all(
-        HOLDER_ACCOUNTS.map(async (holder) => {
-          const chainContract = CONTRACT_ADDRESSES.find((c) => c.chain === holder.chain);
-          if (!chainContract) {
-            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
-          }
-
-          try {
-            const balanceHex = await callErc20Balance(holder.chain as ChainKey, chainContract.address, holder.address);
-            const balanceRaw = hexToBigInt(balanceHex);
-            return {
-              ...holder,
-              balanceRaw,
-              quantity: formatTokenAmount(balanceRaw, decimals, 2),
-              percentage: formatPercentage(balanceRaw, totalSupplyRaw),
-            };
-          } catch (err) {
-            console.warn('Balance fetch failed', holder.address, err);
-            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
-          }
-        })
-      );
-
-      const filtered = holders
-        .filter((holder) => holder.balanceRaw > 0n)
-        .sort((a, b) => (b.balanceRaw > a.balanceRaw ? 1 : -1))
-        .map((holder, index) => ({ ...holder, rank: index + 1 }));
-
-      const state: OnChainState = {
-        isLoading: false,
-        totalSupplyRaw,
-        totalSupplyFormatted,
-        totalSupplyBillions,
-        decimals,
-        holders: filtered,
-        holdersCount: moralisSummary.count,
-        holdersChange: moralisSummary.change,
-      };
-      cachedState = state;
-      return state;
-    } catch (error) {
-      console.error('JPYC on-chain fetch error', error);
-      const state: OnChainState = {
-        isLoading: false,
-        error: error instanceof Error ? error.message : '不明なエラーが発生しました',
-        holders: [],
-      };
-      cachedState = state;
-      return state;
-    } finally {
-      inflightPromise = null;
+  try {
+    const ethereumContract = CONTRACT_ADDRESSES.find((c) => c.chain === 'Ethereum');
+    if (!ethereumContract) {
+      throw new Error('Ethereum の公式コントラクト情報が見つかりません');
     }
-  })();
 
-  return inflightPromise;
+    const [totalSupplyHex, decimals, moralisSummary] = await Promise.all([
+      callErc20TotalSupply('Ethereum', ethereumContract.address),
+      callErc20Decimals('Ethereum', ethereumContract.address),
+      fetchHolderSummary(),
+    ]);
+    const totalSupplyRaw = hexToBigInt(totalSupplyHex);
+    const totalSupplyFormatted = formatTokenAmount(totalSupplyRaw, decimals, 2);
+    const totalSupplyBillions = formatBillions(totalSupplyRaw, decimals);
+
+    const holders = await Promise.all(
+      HOLDER_ACCOUNTS.map(async (holder) => {
+        const chainContract = CONTRACT_ADDRESSES.find((c) => c.chain === holder.chain);
+        if (!chainContract) {
+          return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
+        }
+
+        try {
+          const balanceHex = await callErc20Balance(holder.chain as ChainKey, chainContract.address, holder.address);
+          const balanceRaw = hexToBigInt(balanceHex);
+          return {
+            ...holder,
+            balanceRaw,
+            quantity: formatTokenAmount(balanceRaw, decimals, 2),
+            percentage: formatPercentage(balanceRaw, totalSupplyRaw),
+          };
+        } catch (err) {
+          console.warn('Balance fetch failed', holder.address, err);
+          return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
+        }
+      })
+    );
+
+    // ブラックリストアドレスを読み込み
+    const blacklistAddresses = loadBlacklistAddresses(import.meta.env);
+
+    // ブラックリスト保有量を計算
+    const blacklistedSupply = calculateBlacklistedSupply(holders, blacklistAddresses);
+
+    // 流通供給量を計算
+    const circulatingSupply = calculateCirculatingSupply(totalSupplyRaw, blacklistedSupply);
+
+    // ブラックリストアドレスを除外してフィルタリング
+    const filteredByBlacklist = filterBlacklistedHolders(holders, blacklistAddresses);
+
+    const filtered = filteredByBlacklist
+      .filter((holder) => holder.balanceRaw > 0n)
+      .sort((a, b) => (b.balanceRaw > a.balanceRaw ? 1 : -1))
+      .map((holder, index) => ({ ...holder, rank: index + 1 }));
+
+    const state: OnChainState = {
+      isLoading: false,
+      isStale: false,
+      totalSupplyRaw,
+      totalSupplyFormatted,
+      totalSupplyBillions,
+      decimals,
+      holders: filtered,
+      holdersCount: moralisSummary.count,
+      holdersChange: moralisSummary.change,
+      blacklistedSupply,
+      circulatingSupply,
+    };
+
+    // キャッシュに保存
+    cacheManager.set(CACHE_KEY, state, CACHE_TTL);
+
+    return state;
+  } catch (error) {
+    console.error('JPYC on-chain fetch error', error);
+    const state: OnChainState = {
+      isLoading: false,
+      isStale: false,
+      error: error instanceof Error ? error.message : '不明なエラーが発生しました',
+      holders: [],
+    };
+    return state;
+  }
 }
 
 export const PRICE_PLACEHOLDER = 'Comming Soon';
 
-export function useJpycOnChainData() {
-  const [state, setState] = useState<OnChainState>(cachedState ?? { isLoading: true, holders: [] });
+export function useJpycOnChainDataWithSWR() {
+  const [state, setState] = useState<OnChainState>({ isLoading: true, holders: [] });
+  const [isFetching, setIsFetching] = useState(false);
+
+  const fetchData = useCallback(async (showStale: boolean = false) => {
+    setIsFetching(true);
+
+    try {
+      const freshData = await fetchOnChainState();
+      setState(freshData);
+    } catch (error) {
+      console.error('Failed to fetch fresh data:', error);
+      // エラー時もキャッシュデータは維持
+    } finally {
+      setIsFetching(false);
+    }
+  }, []);
+
+  const refresh = useCallback(() => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    fetchData(false);
+  }, [fetchData]);
 
   useEffect(() => {
     let active = true;
 
-    if (!state.isLoading && !state.error && state.totalSupplyRaw) {
-      return () => {
-        active = false;
-      };
-    }
+    // キャッシュからデータを取得
+    const cached = cacheManager.get<OnChainState>(CACHE_KEY);
 
-    fetchOnChainState().then((data) => {
-      if (!active) return;
-      setState(data);
-    });
+    if (cached) {
+      // キャッシュヒット: Stale データとして即座に表示
+      if (active) {
+        setState({
+          ...cached,
+          isStale: true,
+          isLoading: false,
+          refresh,
+        });
+      }
+
+      // バックグラウンドで最新データを取得 (Revalidate)
+      fetchData(true).then(() => {
+        if (active) {
+          const freshData = cacheManager.get<OnChainState>(CACHE_KEY);
+          if (freshData) {
+            setState({
+              ...freshData,
+              isStale: false,
+              refresh,
+            });
+          }
+        }
+      });
+    } else {
+      // キャッシュミス: 通常のローディング→データ表示
+      fetchData(false).then(() => {
+        if (active) {
+          const freshData = cacheManager.get<OnChainState>(CACHE_KEY);
+          if (freshData) {
+            setState({
+              ...freshData,
+              refresh,
+            });
+          }
+        }
+      });
+    }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [fetchData, refresh]);
 
   return {
     ...state,
     holdersCount: state.holdersCount ?? state.holders.length,
     holdersChange: state.holdersChange,
+    refresh,
   };
 }
