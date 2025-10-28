@@ -18,6 +18,15 @@ type HolderSnapshot = HolderAccount & {
   percentage: string;
 };
 
+type ChainDistribution = {
+  chain: SupportedChain;
+  supply: bigint;
+  supplyFormatted: string;
+  supplyPercentage: number;
+  holdersCount?: number;
+  holdersPercentage?: number;
+};
+
 type OnChainState = {
   isLoading: boolean;
   error?: string;
@@ -28,6 +37,7 @@ type OnChainState = {
   holders: HolderSnapshot[];
   holdersCount?: number;
   holdersChange?: number;
+  chainDistribution?: ChainDistribution[];
 };
 
 let cachedState: OnChainState | null = null;
@@ -55,6 +65,55 @@ function parseNumber(value: unknown): number | undefined {
   return undefined;
 }
 
+async function fetchScanTokenSupply(chain: SupportedChain, address: string): Promise<bigint | undefined> {
+  console.log(`🔍 [Scan API Supply] Attempting to fetch token supply for ${chain}`);
+  const config = SCAN_API_CONFIG[chain];
+  if (!config) {
+    console.warn(`⚠️ [Scan API Supply] No config found for ${chain}`);
+    return undefined;
+  }
+  const apiKey = import.meta.env[config.envKey as keyof ImportMetaEnv];
+  if (!apiKey) {
+    console.warn(`⚠️ [Scan API Supply] No API key found for ${chain} (${config.envKey})`);
+    return undefined;
+  }
+  console.log(`✅ [Scan API Supply] Config and API key found for ${chain}, fetching...`);
+
+  const url = new URL(config.baseUrl);
+  // chainIdがある場合（Polygon等のv2 API）は追加
+  if (config.chainId) {
+    url.searchParams.set('chainid', config.chainId);
+  }
+  url.searchParams.set('module', 'stats');
+  url.searchParams.set('action', 'tokensupply');
+  url.searchParams.set('contractaddress', address);
+  url.searchParams.set('apikey', String(apiKey));
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    const data: { status?: string; message?: string; result?: string } = await response.json();
+    console.log(`🔍 [Scan API Supply] ${chain} Response:`, data);
+    if (data.status === '1' && data.result) {
+      const supply = BigInt(data.result);
+      console.log(`✅ [Scan API Supply] ${chain} Token Supply:`, supply.toString());
+      return supply;
+    } else if (data.message) {
+      console.warn(`Scan API Supply (${chain}) responded with message: ${data.message}`);
+    }
+  } catch (error) {
+    console.warn(`Scan API Supply fetch failed (${chain})`, error);
+  }
+
+  return undefined;
+}
+
 async function fetchScanHolderCount(chain: SupportedChain, address: string): Promise<number | undefined> {
   console.log(`🔍 [Scan API] Attempting to fetch holder count for ${chain}`);
   const config = SCAN_API_CONFIG[chain];
@@ -70,6 +129,10 @@ async function fetchScanHolderCount(chain: SupportedChain, address: string): Pro
   console.log(`✅ [Scan API] Config and API key found for ${chain}, fetching...`);
 
   const url = new URL(config.baseUrl);
+  // chainIdがある場合（Polygon等のv2 API）は追加
+  if (config.chainId) {
+    url.searchParams.set('chainid', config.chainId);
+  }
   url.searchParams.set('module', 'token');
   url.searchParams.set('action', 'tokenholdercount');
   url.searchParams.set('contractaddress', address);
@@ -102,7 +165,92 @@ async function fetchScanHolderCount(chain: SupportedChain, address: string): Pro
   return undefined;
 }
 
-async function fetchHolderSummary(): Promise<{ count?: number; change?: number }> {
+/**
+ * ブラックリストアドレスの保有量を取得
+ */
+async function fetchBlacklistBalance(chain: SupportedChain, tokenAddress: string, blacklistAddress: string): Promise<bigint | undefined> {
+  console.log(`🔍 [Blacklist Balance] Fetching balance for ${blacklistAddress} on ${chain}`);
+  const config = SCAN_API_CONFIG[chain];
+  if (!config) {
+    console.warn(`⚠️ [Blacklist Balance] No config found for ${chain}`);
+    return undefined;
+  }
+  const apiKey = import.meta.env[config.envKey as keyof ImportMetaEnv];
+  if (!apiKey) {
+    console.warn(`⚠️ [Blacklist Balance] No API key found for ${chain} (${config.envKey})`);
+    return undefined;
+  }
+
+  const url = new URL(config.baseUrl);
+  // chainIdがある場合（Polygon等のv2 API）は追加
+  if (config.chainId) {
+    url.searchParams.set('chainid', config.chainId);
+  }
+  url.searchParams.set('module', 'account');
+  url.searchParams.set('action', 'tokenbalance');
+  url.searchParams.set('contractaddress', tokenAddress);
+  url.searchParams.set('address', blacklistAddress);
+  url.searchParams.set('tag', 'latest');
+  url.searchParams.set('apikey', String(apiKey));
+
+  try {
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+    const data: { status?: string; message?: string; result?: string } = await response.json();
+    console.log(`🔍 [Blacklist Balance] ${chain} Response:`, data);
+    if (data.status === '1' && data.result) {
+      const balance = BigInt(data.result);
+      console.log(`✅ [Blacklist Balance] ${chain} ${blacklistAddress}: ${balance.toString()}`);
+      return balance;
+    } else if (data.message) {
+      console.warn(`Blacklist Balance API (${chain}) responded with message: ${data.message}`);
+    }
+  } catch (error) {
+    console.warn(`Blacklist Balance fetch failed (${chain})`, error);
+  }
+
+  return undefined;
+}
+
+/**
+ * チェーンごとのブラックリスト合計保有量を取得
+ */
+async function fetchTotalBlacklistBalance(chain: SupportedChain, tokenAddress: string): Promise<bigint> {
+  console.log(`🔍 [Total Blacklist] Fetching total blacklist balance for ${chain}`);
+
+  // 環境変数からブラックリストアドレスを取得
+  const blacklistEnv = import.meta.env.VITE_BLACKLIST_ADDRESSES;
+  if (!blacklistEnv || blacklistEnv.trim() === '') {
+    console.log(`ℹ️ [Total Blacklist] No blacklist addresses configured for ${chain}`);
+    return 0n;
+  }
+
+  const blacklistAddresses = blacklistEnv.split(',').map(addr => addr.trim()).filter(addr => addr !== '');
+  console.log(`📋 [Total Blacklist] ${chain} blacklist addresses:`, blacklistAddresses);
+
+  let totalBlacklisted = 0n;
+  for (const address of blacklistAddresses) {
+    const balance = await fetchBlacklistBalance(chain, tokenAddress, address);
+    if (balance !== undefined) {
+      totalBlacklisted += balance;
+    }
+  }
+
+  console.log(`✅ [Total Blacklist] ${chain} total blacklisted: ${totalBlacklisted.toString()}`);
+  return totalBlacklisted;
+}
+
+async function fetchHolderSummary(): Promise<{
+  count?: number;
+  change?: number;
+  byChain: Map<SupportedChain, { count?: number; change?: number }>;
+}> {
   console.log('📊 [Holder Summary] Starting holder count fetch...');
   const uniqueContracts = new Map<SupportedChain, typeof CONTRACT_ADDRESSES[number]>();
   for (const contract of CONTRACT_ADDRESSES) {
@@ -115,21 +263,25 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
 
   const requests = Array.from(uniqueContracts.entries()).map(async ([chainKey, contract]) => {
     console.log(`📊 [Holder Summary] Processing ${chainKey}...`);
-    if (chainKey === 'Polygon') {
-      console.log('🔍 [Holder Summary] Using Scan API for Polygon');
-      const polygonCount = await fetchScanHolderCount(chainKey, contract.address);
-      return { count: polygonCount, change: undefined };
+
+    // すべてのチェーンでScan APIを試してから、失敗時にMoralis APIにフォールバック
+    const scanCount = await fetchScanHolderCount(chainKey, contract.address);
+    if (scanCount !== undefined) {
+      console.log(`✅ [Holder Summary] ${chainKey} holder count from Scan API: ${scanCount}`);
+      return { chain: chainKey, count: scanCount, change: undefined };
     }
+
+    console.log(`⚠️ [Holder Summary] Scan API failed for ${chainKey}, trying Moralis API...`);
 
     const chainId = MORALIS_CHAIN_IDS[chainKey];
     console.log(`🔍 [Holder Summary] Using Moralis API for ${chainKey} (chainId: ${chainId})`);
     if (!chainId) {
       console.warn(`⚠️ [Moralis API] No chain ID found for ${chainKey}`);
-      return { count: undefined, change: undefined };
+      return { chain: chainKey, count: undefined, change: undefined };
     }
     if (!MORALIS_API_KEY) {
       console.warn(`⚠️ [Moralis API] No API key found (VITE_MORALIS_API_KEY)`);
-      return { count: undefined, change: undefined };
+      return { chain: chainKey, count: undefined, change: undefined };
     }
 
     const params = new URLSearchParams({
@@ -195,12 +347,13 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
       console.log(`✅ [Moralis API] ${chainKey} Parsed:`, { count: total, change });
 
       return {
+        chain: chainKey,
         count: total,
         change,
       };
     } catch (error) {
       console.error(`Moralis holders fetch failed (${chainKey})`, error);
-      return { count: undefined, change: undefined };
+      return { chain: chainKey, count: undefined, change: undefined };
     }
   });
 
@@ -212,7 +365,11 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
   let hasCount = false;
   let hasChange = false;
 
+  const byChain = new Map<SupportedChain, { count?: number; change?: number }>();
+
   for (const res of results) {
+    byChain.set(res.chain, { count: res.count, change: res.change });
+
     if (res.count !== undefined) {
       hasCount = true;
       countTotal += res.count;
@@ -226,6 +383,7 @@ async function fetchHolderSummary(): Promise<{ count?: number; change?: number }
   const summary = {
     count: hasCount ? Math.round(countTotal) : undefined,
     change: hasChange && MORALIS_API_KEY ? Math.round(changeTotal) : undefined,
+    byChain,
   };
 
   console.log('✅ [Holder Summary] Final:', summary);
@@ -253,12 +411,27 @@ async function fetchOnChainState(): Promise<OnChainState> {
         callErc20Decimals('Ethereum', ethereumContract.address),
         fetchHolderSummary(),
       ]);
-      const totalSupplyRaw = hexToBigInt(totalSupplyHex);
+      const totalSupplyRawBeforeBlacklist = hexToBigInt(totalSupplyHex);
+
+      // Ethereumチェーンのブラックリスト保有量を取得
+      console.log('🔍 [Ethereum Supply] Fetching blacklist balances for Ethereum...');
+      const ethereumBlacklistBalance = await fetchTotalBlacklistBalance('Ethereum', ethereumContract.address);
+      const totalSupplyRaw = totalSupplyRawBeforeBlacklist - ethereumBlacklistBalance;
+
+      console.log('📊 [Ethereum Supply] Adjustment:', {
+        rawSupply: totalSupplyRawBeforeBlacklist.toString(),
+        blacklisted: ethereumBlacklistBalance.toString(),
+        adjusted: totalSupplyRaw.toString(),
+        rawFormatted: formatTokenAmount(totalSupplyRawBeforeBlacklist, decimals, 2),
+        blacklistedFormatted: formatTokenAmount(ethereumBlacklistBalance, decimals, 2),
+        adjustedFormatted: formatTokenAmount(totalSupplyRaw, decimals, 2),
+      });
+
       const totalSupplyFormatted = formatTokenAmount(totalSupplyRaw, decimals, 2);
       const totalSupplyBillions = formatBillions(totalSupplyRaw, decimals);
 
       // 実際の値をログ出力
-      console.log('📊 [OnChain Data] Total Supply:', {
+      console.log('📊 [OnChain Data] Total Supply (After Blacklist):', {
         raw: totalSupplyRaw.toString(),
         formatted: totalSupplyFormatted,
         billions: totalSupplyBillions,
@@ -297,6 +470,85 @@ async function fetchOnChainState(): Promise<OnChainState> {
         .sort((a, b) => (b.balanceRaw > a.balanceRaw ? 1 : -1))
         .map((holder, index) => ({ ...holder, rank: index + 1 }));
 
+      // 各チェーンの総供給量を取得
+      console.log('📊 [Chain Supply] Starting supply fetch for all chains...');
+      const chainSupplies = await Promise.all(
+        CONTRACT_ADDRESSES.filter((c) => c.chain === 'Ethereum' || c.chain === 'Polygon' || c.chain === 'Avalanche').map(
+          async (contract) => {
+            console.log(`🔍 [Chain Supply] Fetching ${contract.chain} supply from ${contract.address}`);
+            let rawSupply = 0n;
+
+            try {
+              // まずRPC経由で取得を試みる
+              const supplyHex = await callErc20TotalSupply(contract.chain as ChainKey, contract.address);
+              rawSupply = hexToBigInt(supplyHex);
+              console.log(`✅ [Chain Supply] ${contract.chain} (RPC): ${rawSupply.toString()} (${formatTokenAmount(rawSupply, decimals, 2)} JPYC)`);
+            } catch (error) {
+              console.warn(`⚠️ [Chain Supply] RPC failed for ${contract.chain}, trying Scan API...`, error);
+              // RPC失敗時はScan APIにフォールバック
+              try {
+                const scanSupply = await fetchScanTokenSupply(contract.chain as SupportedChain, contract.address);
+                if (scanSupply !== undefined) {
+                  rawSupply = scanSupply;
+                  console.log(`✅ [Chain Supply] ${contract.chain} (Scan API): ${rawSupply.toString()} (${formatTokenAmount(rawSupply, decimals, 2)} JPYC)`);
+                }
+              } catch (scanError) {
+                console.error(`❌ [Chain Supply] Scan API also failed for ${contract.chain}:`, scanError);
+              }
+              if (rawSupply === 0n) {
+                console.error(`❌ [Chain Supply] All methods failed for ${contract.chain}`);
+                return { chain: contract.chain as SupportedChain, supply: 0n };
+              }
+            }
+
+            // ブラックリストアドレスの保有量を取得して差し引く
+            console.log(`🔍 [Chain Supply] Fetching blacklist balances for ${contract.chain}...`);
+            const blacklistBalance = await fetchTotalBlacklistBalance(contract.chain as SupportedChain, contract.address);
+            const adjustedSupply = rawSupply - blacklistBalance;
+            console.log(`📊 [Chain Supply] ${contract.chain} Adjustment:`, {
+              rawSupply: rawSupply.toString(),
+              blacklisted: blacklistBalance.toString(),
+              adjusted: adjustedSupply.toString(),
+              rawFormatted: formatTokenAmount(rawSupply, decimals, 2),
+              blacklistedFormatted: formatTokenAmount(blacklistBalance, decimals, 2),
+              adjustedFormatted: formatTokenAmount(adjustedSupply, decimals, 2),
+            });
+
+            return { chain: contract.chain as SupportedChain, supply: adjustedSupply };
+          }
+        )
+      );
+
+      // チェーンごとに集計（重複排除）
+      const chainSupplyMap = new Map<SupportedChain, bigint>();
+      for (const { chain, supply } of chainSupplies) {
+        if (!chainSupplyMap.has(chain) || chainSupplyMap.get(chain)! < supply) {
+          chainSupplyMap.set(chain, supply);
+        }
+      }
+
+      // chainDistributionを作成
+      const chainDistribution: ChainDistribution[] = Array.from(chainSupplyMap.entries()).map(([chain, supply]) => {
+        const supplyPercentage = totalSupplyRaw > 0n ? Number((supply * 10000n) / totalSupplyRaw) / 100 : 0;
+        const holdersData = moralisSummary.byChain.get(chain);
+        const holdersCount = holdersData?.count;
+        const holdersPercentage =
+          holdersCount !== undefined && moralisSummary.count
+            ? (holdersCount / moralisSummary.count) * 100
+            : undefined;
+
+        return {
+          chain,
+          supply,
+          supplyFormatted: formatTokenAmount(supply, decimals, 2),
+          supplyPercentage,
+          holdersCount,
+          holdersPercentage,
+        };
+      });
+
+      console.log('📊 [OnChain Data] Chain Distribution:', chainDistribution);
+
       const state: OnChainState = {
         isLoading: false,
         totalSupplyRaw,
@@ -306,6 +558,7 @@ async function fetchOnChainState(): Promise<OnChainState> {
         holders: filtered,
         holdersCount: moralisSummary.count,
         holdersChange: moralisSummary.change,
+        chainDistribution,
       };
       cachedState = state;
       return state;

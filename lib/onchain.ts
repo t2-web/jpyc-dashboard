@@ -103,10 +103,15 @@ export function addThousandsSeparator(value: string): string {
   return value.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-export function formatBillions(value: bigint, decimals: number): string {
+export function formatMillions(value: bigint, decimals: number): string {
   const numeric = Number(value) / Math.pow(10, decimals);
   if (!Number.isFinite(numeric)) return '0';
-  return (numeric / 1_000_000_000).toFixed(1);
+  return (numeric / 1_000_000).toFixed(1);
+}
+
+// 後方互換性のため残す
+export function formatBillions(value: bigint, decimals: number): string {
+  return formatMillions(value, decimals);
 }
 
 export function formatPercentage(value: bigint, total: bigint): string {

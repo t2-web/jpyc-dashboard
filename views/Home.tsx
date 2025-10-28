@@ -1,20 +1,74 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Card from '../components/Card';
 import StatCard from '../components/DataCard';
 import HeroBackground from '../components/HeroBackground';
+import ChainDistributionBar from '../components/ChainDistributionBar';
 import { PlayIcon } from '../components/icons';
 import { ANNOUNCEMENTS } from '../constants';
-import { PRICE_PLACEHOLDER, useJpycOnChainData } from '../hooks/useJpycOnChainData';
+import { useJpycOnChainData } from '../hooks/useJpycOnChainData';
+import { useJpycPrice } from '../hooks/useJpycPrice';
+import { formatPrice, formatVolume, formatChange, formatMarketCap } from '../lib/coingecko';
 
 const Home: React.FC = () => {
-    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount, holdersChange } = useJpycOnChainData();
+    // Twitter Widgetを初期化
+    useEffect(() => {
+        // Twitterのウィジェットスクリプトが読み込まれているか確認
+        if ((window as any).twttr?.widgets) {
+            console.log('🐦 [Twitter Widget] Loading widgets...');
+            (window as any).twttr.widgets.load();
+        } else {
+            // スクリプトが読み込まれていない場合は、読み込み完了を待つ
+            const checkTwitterScript = setInterval(() => {
+                if ((window as any).twttr?.widgets) {
+                    console.log('🐦 [Twitter Widget] Script loaded, initializing widgets...');
+                    (window as any).twttr.widgets.load();
+                    clearInterval(checkTwitterScript);
+                }
+            }, 100);
 
-    const supplyShort = isLoading ? '読み込み中…' : totalSupplyBillions ? `¥${totalSupplyBillions}B` : '—';
+            // 10秒後にタイムアウト
+            setTimeout(() => {
+                clearInterval(checkTwitterScript);
+                console.warn('⚠️ [Twitter Widget] Script loading timeout');
+            }, 10000);
+        }
+    }, []);
+
+    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount, holdersChange, chainDistribution } = useJpycOnChainData();
+    const priceState = useJpycPrice();
+
+    const supplyShort = isLoading ? '読み込み中…' : totalSupplyBillions ? `¥${totalSupplyBillions}M` : '—';
     const supplyFull = isLoading ? '読み込み中…' : totalSupplyFormatted ? `${totalSupplyFormatted} JPYC` : '—';
     const holdersLabel = isLoading ? '読み込み中…' : holdersCount ? holdersCount.toLocaleString('ja-JP') : 'Comming Soon';
-    const holdersSubtitle = holdersCount ? 'スキャン + Moralis 集計（3チェーン合算）' : 'API キーの設定が必要です';
+    const holdersSubtitle = holdersCount ? 'スキャン）' : 'API キーの設定が必要です';
     const holdersChangeText = holdersCount && holdersChange !== undefined ? `${holdersChange >= 0 ? '+' : ''}${holdersChange.toLocaleString('ja-JP')} (24h)` : undefined;
     const holdersChangeClass = holdersChangeText ? (holdersChange! >= 0 ? 'text-green-600' : 'text-red-500') : '';
+
+    // 価格データの表示ロジック
+    // USD価格の逆数で円建て価格を計算（1 JPYC = 1/usd JPY）
+    const priceInJPY = priceState.data ? (1 / priceState.data.usd).toFixed(2) : null;
+    const priceLabel = priceState.isLoading
+        ? '読み込み中…'
+        : priceState.data
+            ? `¥${priceInJPY} (${formatPrice(priceState.data.usd)})`
+            : 'Coming Soon';
+    const priceSubtitle = priceState.data ? `時価総額: ${formatMarketCap(priceState.data.usd_market_cap)}` : priceState.error ? priceState.error : 'CoinGecko API から取得';
+    const priceChangeText = priceState.data ? formatChange(priceState.data.usd_24h_change) : undefined;
+    const priceChangeClass = priceChangeText && priceState.data ? (priceState.data.usd_24h_change >= 0 ? 'text-green-600' : 'text-red-500') : '';
+    const volumeText = priceState.data ? `24h取引高: ${formatVolume(priceState.data.usd_24h_vol)}` : undefined;
+
+    // チェーン分布データの準備
+    const supplyDistributionData = chainDistribution?.map((item) => ({
+        chain: item.chain,
+        value: item.supplyFormatted,
+        percentage: item.supplyPercentage,
+    })) || [];
+
+    const holdersDistributionData = chainDistribution?.filter((item) => item.holdersCount !== undefined).map((item) => ({
+        chain: item.chain,
+        value: item.holdersCount!.toLocaleString('ja-JP'),
+        percentage: item.holdersPercentage ?? 0,
+    })) || [];
 
     return (
         <div>
@@ -45,11 +99,23 @@ const Home: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Stats Section */}
                 <section className="-mt-16 relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <StatCard title="現在価格">
                             <div className="flex flex-col items-start">
-                                <p className="text-3xl font-bold tracking-tight">{PRICE_PLACEHOLDER}</p>
-                                <p className="text-sm text-on-surface-secondary mt-1">オンチェーン価格連携を準備中です</p>
+                                <p className="text-3xl font-bold tracking-tight">{priceLabel}</p>
+                                <p className="text-sm text-on-surface-secondary mt-1">{priceSubtitle}</p>
+                                {priceChangeText && (
+                                    <p className={`text-sm mt-1 ${priceChangeClass}`}>{priceChangeText}</p>
+                                )}
+                                {priceState.error && <p className="text-xs text-red-500 mt-1">{priceState.error}</p>}
+                            </div>
+                        </StatCard>
+                        <StatCard title="24h取引高">
+                            <div className="flex flex-col items-start">
+                                <p className="text-3xl font-bold tracking-tight">
+                                    {priceState.isLoading ? '読み込み中…' : priceState.data ? formatVolume(priceState.data.usd_24h_vol) : '—'}
+                                </p>
+                                <p className="text-sm text-on-surface-secondary mt-1"></p>
                             </div>
                         </StatCard>
                         <StatCard title="総供給量">
@@ -82,28 +148,35 @@ const Home: React.FC = () => {
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Chain Distribution Charts */}
+                            <div className="mt-12 space-y-8">
+                                <ChainDistributionBar
+                                    title="チェーン別総供給量"
+                                    data={supplyDistributionData}
+                                    isLoading={isLoading}
+                                />
+                                <ChainDistributionBar
+                                    title="チェーン別保有者数"
+                                    data={holdersDistributionData}
+                                    isLoading={isLoading}
+                                />
+                            </div>
                         </div>
 
-                        {/* Getting Started */}
+                        {/* X (Twitter) Timeline */}
                         <div>
-                             <h2 className="text-2xl font-bold mb-6">はじめての JPYC</h2>
-                             <Card className="relative overflow-hidden">
-                                <div className="opacity-50 blur-sm select-none pointer-events-none">
-                                    <div className="aspect-video bg-secondary rounded-lg flex items-center justify-center">
-                                        <PlayIcon />
-                                    </div>
-                                    <p className="text-on-surface-secondary my-4">
-                                        JPYC の基本的な使い方から DeFi での活用方法まで、わかりやすく解説します。
-                                    </p>
-                                    <button className="w-full bg-primary text-white font-semibold py-3 rounded-lg hover:bg-primary-hover transition-colors">
-                                        チュートリアルを見る
-                                    </button>
-                                </div>
-                                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                    <div className="rounded-full bg-slate-900/70 px-6 py-2 text-sm font-semibold uppercase tracking-[0.2em] text-white">
-                                        Comming Soon
-                                    </div>
-                                </div>
+                             <h2 className="text-2xl font-bold mb-6">最新情報</h2>
+                             <Card className="h-[600px] overflow-hidden">
+                                <a
+                                    className="twitter-timeline"
+                                    data-height="600"
+                                    data-theme="light"
+                                    data-chrome="noheader nofooter noborders"
+                                    href="https://x.com/jpyc_official?ref_src=twsrc%5Etfw"
+                                >
+                                    Tweets by jpyc_official
+                                </a>
                              </Card>
                         </div>
                     </div>

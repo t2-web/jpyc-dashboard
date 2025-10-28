@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_POLYGONSCAN_API_KEY?: string;
   readonly VITE_SNOWTRACE_API_KEY?: string;
   readonly VITE_BLACKLIST_ADDRESSES?: string;
+  readonly VITE_GA_MEASUREMENT_ID?: string;
 }
 
 interface ImportMeta {

@@ -76,10 +76,10 @@ export const MORALIS_CHAIN_IDS: Record<SupportedChain, string> = {
     Avalanche: '0xa86a',
 };
 
-export const SCAN_API_CONFIG: Record<SupportedChain, { envKey: string; baseUrl: string } | null> = {
-    Ethereum: { envKey: 'VITE_ETHERSCAN_API_KEY', baseUrl: 'https://api.etherscan.io/api' },
-    Polygon: { envKey: 'VITE_POLYGONSCAN_API_KEY', baseUrl: 'https://api.polygonscan.com/api' },
-    Avalanche: { envKey: 'VITE_SNOWTRACE_API_KEY', baseUrl: 'https://api.snowtrace.io/api' },
+export const SCAN_API_CONFIG: Record<SupportedChain, { envKey: string; baseUrl: string; chainId?: string } | null> = {
+    Ethereum: { envKey: 'VITE_ETHERSCAN_API_KEY', baseUrl: 'https://api.etherscan.io/v2/api', chainId: '1' },
+    Polygon: { envKey: 'VITE_POLYGONSCAN_API_KEY', baseUrl: 'https://api.etherscan.io/v2/api', chainId: '137' },
+    Avalanche: { envKey: 'VITE_SNOWTRACE_API_KEY', baseUrl: 'https://api.snowtrace.io/api', chainId: '43114' },
 };
 
 // TODO: Update with real data

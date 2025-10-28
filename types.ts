@@ -1,7 +1,7 @@
 // Fix: Import React to use React.ReactNode type.
 import React from 'react';
 
-export type Tab = 'ホーム' | '分析' | 'エコシステム' | 'チュートリアル' | 'コミュニティ' | 'セキュリティ';
+export type Tab = 'ホーム' | '分析' | 'エコシステム' | 'チュートリアル' | 'セキュリティ' | 'プライバシーポリシー' | '利用規約';
 
 export interface ContractAddress {
   chain: string;
@@ -52,4 +52,15 @@ export interface ScamContract {
   reportedAt: string;
   status: '無効化済み' | '調査中' | '注意喚起';
   note?: string;
+}
+
+export interface CoinGeckoPriceData {
+  usd: number;
+  usd_market_cap: number;
+  usd_24h_vol: number;
+  usd_24h_change: number;
+}
+
+export interface CoinGeckoResponse {
+  jpycoin: CoinGeckoPriceData;
 }
