@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/ny/.config/**)",
+      "Read(//Users/ny/Library/**)",
+      "Bash(cat:*)",
+      "Bash(node:*)",
+      "Read(//Users/ny/**)",
+      "Bash(uvx:*)",
+      "Bash(curl:*)",
+      "Bash(echo:*)",
+      "Bash(mv:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx playwright show-report:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enabledMcpjsonServers": [
+    "serena"
+  ]
+}

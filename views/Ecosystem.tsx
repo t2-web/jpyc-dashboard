@@ -8,7 +8,7 @@ const Ecosystem: React.FC = () => {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-3xl font-bold text-on-surface mb-2">DeFiエコシステム</h1>
+        <h1 className="text-3xl font-bold text-on-surface mb-2">エコシステム</h1>
         <p className="text-on-surface-secondary">JPYC を活用できる主要なプラットフォームとプロトコルを紹介します。</p>
       </section>
 

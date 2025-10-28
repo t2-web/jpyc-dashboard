@@ -7,11 +7,14 @@ import { ANNOUNCEMENTS } from '../constants';
 import { PRICE_PLACEHOLDER, useJpycOnChainData } from '../hooks/useJpycOnChainData';
 
 const Home: React.FC = () => {
-    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount } = useJpycOnChainData();
+    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount, holdersChange } = useJpycOnChainData();
 
     const supplyShort = isLoading ? '読み込み中…' : totalSupplyBillions ? `¥${totalSupplyBillions}B` : '—';
     const supplyFull = isLoading ? '読み込み中…' : totalSupplyFormatted ? `${totalSupplyFormatted} JPYC` : '—';
-    const holdersLabel = isLoading ? '読み込み中…' : 'Comming Soon';
+    const holdersLabel = isLoading ? '読み込み中…' : holdersCount ? holdersCount.toLocaleString('ja-JP') : 'Comming Soon';
+    const holdersSubtitle = holdersCount ? 'スキャン + Moralis 集計（3チェーン合算）' : 'API キーの設定が必要です';
+    const holdersChangeText = holdersCount && holdersChange !== undefined ? `${holdersChange >= 0 ? '+' : ''}${holdersChange.toLocaleString('ja-JP')} (24h)` : undefined;
+    const holdersChangeClass = holdersChangeText ? (holdersChange! >= 0 ? 'text-green-600' : 'text-red-500') : '';
 
     return (
         <div>
@@ -25,7 +28,7 @@ const Home: React.FC = () => {
                             <span className="block text-primary mt-2">JPYC</span>
                         </h1>
                         <p className="mt-6 max-w-2xl mx-auto text-lg text-white/85">
-                            安心して理解し、使えるデジタル円。透明性の高い運営と豊富なDeFiエコシステムで、新しい金融体験を提供します。
+                            安心して理解し、使えるデジタル円。透明性の高い運営と広がるエコシステムで、新しい金融体験を提供します。
                         </p>
                         <div className="mt-10 flex flex-col sm:flex-row sm:justify-center gap-4">
                             <button className="px-8 py-3 bg-primary text-white font-semibold rounded-lg shadow-md hover:bg-primary-hover transition-colors">
@@ -56,7 +59,10 @@ const Home: React.FC = () => {
                         </StatCard>
                         <StatCard title="保有者数">
                             <p className="text-3xl font-bold">{holdersLabel}</p>
-                            <p className="text-sm text-on-surface-secondary mt-1">オンチェーン保有者カウントは準備中です</p>
+                            <p className="text-sm text-on-surface-secondary mt-1">{holdersSubtitle}</p>
+                            {holdersChangeText && (
+                                <p className={`text-sm mt-1 ${holdersChangeClass}`}>{holdersChangeText}</p>
+                            )}
                         </StatCard>
                     </div>
                 </section>

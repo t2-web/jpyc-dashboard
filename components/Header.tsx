@@ -1,5 +1,7 @@
 import React from 'react';
 import { type Tab } from '../types';
+import portalLogo from '../image/logo.svg';
+import portalIcon from '../image/favicon.svg';
 
 interface HeaderProps {
   activeTab: Tab;
@@ -27,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   const navItems: { label: Tab }[] = [
     { label: 'ホーム' },
     { label: '分析' },
-    { label: 'DeFiエコシステム' },
+    { label: 'エコシステム' },
     { label: 'チュートリアル' },
     { label: 'コミュニティ' },
     { label: 'セキュリティ' },
@@ -37,8 +39,8 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
     <header className="bg-surface sticky top-0 z-50 border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <span className="font-bold text-2xl text-primary">JPYC Portal</span>
+          <div className="flex items-center gap-4">
+            <img src={portalLogo} alt="JPYC Portal" className="h-12 w-auto" />
           </div>
           <nav className="hidden md:flex items-center space-x-4">
             {navItems.map((item) => (

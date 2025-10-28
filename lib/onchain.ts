@@ -5,9 +5,9 @@ const FUNCTION_SIG = {
 };
 
 const DEFAULT_RPC: Record<string, string> = {
-  Ethereum: import.meta.env.VITE_ETHEREUM_RPC_URL ?? 'https://eth.llamarpc.com',
-  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? 'https://polygon.llamarpc.com',
-  Avalanche: import.meta.env.VITE_AVALANCHE_RPC_URL ?? 'https://avax.meowrpc.com',
+  Ethereum: import.meta.env.VITE_ETHEREUM_RPC_URL ?? 'https://rpc.ankr.com/eth',
+  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? 'https://polygon-rpc.com',
+  Avalanche: import.meta.env.VITE_AVALANCHE_RPC_URL ?? 'https://avalanche-c-chain.publicnode.com',
 };
 
 export type ChainKey = 'Ethereum' | 'Polygon' | 'Avalanche';
@@ -39,11 +39,6 @@ export async function callErc20Decimals(chain: ChainKey, contract: string): Prom
   return Number(BigInt(normalizeHex(raw)));
 }
 
-export async function callErc20holder(chain: ChainKey, contract: string): Promise<number> {
-  const raw = await callRpc(chain, contract, FUNCTION_SIG.holders);
-  return Number(BigInt(normalizeHex(raw)));
-}
-
 export async function callErc20Balance(chain: ChainKey, contract: string, holder: string): Promise<string> {
   return callRpc(chain, contract, encodeBalanceOf(holder));
 }
@@ -62,13 +57,19 @@ async function callRpc(chain: ChainKey, contract: string, data: string): Promise
     ],
   };
 
-  const response = await fetch(getRpcUrl(chain), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(getRpcUrl(chain), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      mode: 'cors',
+    });
+  } catch (error) {
+    throw new Error(`${chain} RPC 接続に失敗しました: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   if (!response.ok) {
     throw new Error(`${chain} RPC エラー: ${response.status} ${response.statusText}`);

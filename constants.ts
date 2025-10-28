@@ -1,4 +1,4 @@
-import { type ContractAddress, type DeFiProtocol, type TutorialSection, type EcosystemResource, type ScamContract, type HolderAccount } from './types';
+import { type ContractAddress, type DeFiProtocol, type TutorialSection, type EcosystemResource, type ScamContract, type HolderAccount, type SupportedChain } from './types';
 export const OPERATION_WALLET = "0x431D5dff03120AFA4bDf332c61A6e1766eF37BDB";
 
 export const CONTRACT_ADDRESSES: ContractAddress[] = [
@@ -69,6 +69,18 @@ export const HOLDER_ACCOUNTS: HolderAccount[] = [
     { rank: 4, address: '0x5DF9B87991262F6BA471F09758CDE1c0FC1De734', chain: 'Ethereum' },
     { rank: 5, address: '0x1Db3439a222C519ab44bb1144fC28167b4Fa6EE6', chain: 'Polygon' },
 ];
+
+export const MORALIS_CHAIN_IDS: Record<SupportedChain, string> = {
+    Ethereum: '0x1',
+    Polygon: '0x89',
+    Avalanche: '0xa86a',
+};
+
+export const SCAN_API_CONFIG: Record<SupportedChain, { envKey: string; baseUrl: string } | null> = {
+    Ethereum: { envKey: 'VITE_ETHERSCAN_API_KEY', baseUrl: 'https://api.etherscan.io/api' },
+    Polygon: { envKey: 'VITE_POLYGONSCAN_API_KEY', baseUrl: 'https://api.polygonscan.com/api' },
+    Avalanche: { envKey: 'VITE_SNOWTRACE_API_KEY', baseUrl: 'https://api.snowtrace.io/api' },
+};
 
 // TODO: Update with real data
 export const priceChartData = [

@@ -1,7 +1,7 @@
 // Fix: Import React to use React.ReactNode type.
 import React from 'react';
 
-export type Tab = 'ホーム' | '分析' | 'DeFiエコシステム' | 'チュートリアル' | 'コミュニティ' | 'セキュリティ';
+export type Tab = 'ホーム' | '分析' | 'エコシステム' | 'チュートリアル' | 'コミュニティ' | 'セキュリティ';
 
 export interface ContractAddress {
   chain: string;
