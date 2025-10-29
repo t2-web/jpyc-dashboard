@@ -4,10 +4,12 @@ const FUNCTION_SIG = {
   balanceOf: '0x70a08231',
 };
 
+const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
+
 const DEFAULT_RPC: Record<string, string> = {
-  Ethereum: import.meta.env.VITE_ETHEREUM_RPC_URL ?? 'https://rpc.ankr.com/eth',
-  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? 'https://polygon-rpc.com',
-  Avalanche: import.meta.env.VITE_AVALANCHE_RPC_URL ?? 'https://avalanche-c-chain.publicnode.com',
+  Ethereum: import.meta.env.VITE_ETHEREUM_RPC_URL ?? (ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://rpc.ankr.com/eth'),
+  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? (ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://polygon.llamarpc.com'),
+  Avalanche: import.meta.env.VITE_AVALANCHE_RPC_URL ?? (ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://avalanche.public-rpc.com'),
 };
 
 export type ChainKey = 'Ethereum' | 'Polygon' | 'Avalanche';

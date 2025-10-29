@@ -4,18 +4,20 @@
 
 本設計は、JPYC Analytics Dashboard における既存のオンチェーンデータ取得機能を強化し、パフォーマンス、信頼性、UX の向上を実現します。現在の実装（`useJpycOnChainData.ts`, `lib/onchain.ts`）を基盤として、TTL 付きローカル永続キャッシュ、SWR パターン、ブラックリストアドレス対応、チェーン別データ可視化を追加します。
 
-**Purpose**: 既存のデータ取得ロジックを拡張し、キャッシュ機構によるパフォーマンス最適化、エラーハンドリングの強化、UX の向上を実現する。
+**Purpose**: 既存のデータ取得ロジックを拡張し、RPC経由での直接取得、キャッシュ機構によるパフォーマンス最適化、エラーハンドリングの強化、UX の向上を実現する。
 
-**Users**: JPYC 保有者、データアナリスト、開発者が、3チェーン（Ethereum、Polygon、Avalanche）の総供給量と保有者数をリアルタイムかつ効率的に確認できる。
+**Users**: JPYC 保有者、データアナリスト、開発者が、3チェーン（Ethereum、Polygon、Avalanche）の総供給量をリアルタイムかつ効率的に確認できる。
 
 **Impact**: 現在のインメモリキャッシュ実装を、ローカルストレージベースの永続キャッシュ + SWR パターンに置き換え、API 呼び出しを最大 30 分に 1 回に制限することで、レート制限違反を防ぎ、ユーザー体験を向上させる。
+
+**注記**: 2025年10月の更新により、Moralis APIとScan API依存を削除し、RPC経由でのデータ取得に移行しました。保有者数機能は削除され、総供給量とチェーン別分布のみをRPC経由で取得します。
 
 ### Goals
 
 - **キャッシュ永続化**: ローカルストレージに TTL 付きキャッシュを実装し、ページリロード後もデータを保持
 - **SWR パターン実装**: キャッシュデータを即座に表示しながら、バックグラウンドで最新データを取得
-- **ブラックリストアドレス対応**: 指定されたアドレスを総供給量・保有者数から除外
-- **チェーン別可視化**: 各チェーンの総供給量と保有者数を円グラフで表示
+- **ブラックリストアドレス対応**: 指定されたアドレスを総供給量から除外
+- **チェーン別可視化**: 各チェーンの総供給量を横棒グラフで表示（最大チェーンを100%とする相対表示）
 - **パフォーマンス目標**: 初回ロード 3 秒以内、キャッシュ利用時 1 秒以内
 
 ### Non-Goals
@@ -47,8 +49,9 @@
 
 **Integration Points**:
 - RPC エンドポイント（Ethereum, Polygon, Avalanche）
-- Moralis API（保有者数取得）
-- スキャン API（Etherscan, Polygonscan, Snowtrace）
+  - 総供給量取得（`totalSupply()`）
+  - ブラックリスト残高取得（`balanceOf()`）
+  - デシマル取得（`decimals()`）
 
 ### High-Level Architecture
 
@@ -160,8 +163,8 @@ flowchart TD
 | Requirement | Components | Interfaces | Flows |
 |-------------|------------|------------|-------|
 | 1.1-1.5 (総供給量データ取得) | DataFetcher, BlacklistFilter | `fetchTotalSupplyData()` | SWR Data Flow |
-| 2.1-2.5 (保有者数データ取得) | DataFetcher, BlacklistFilter | `fetchHoldersData()` | SWR Data Flow |
-| 3.1-3.5 (チェーン別可視化) | ChartDataAggregator, PieChart | `aggregateChainData()` | - |
+| ~~2.1-2.5 (保有者数データ取得)~~ | ~~削除済み~~ | ~~削除済み~~ | ~~削除済み~~ |
+| 3.1-3.5 (チェーン別可視化) | ChartDataAggregator, BarChart | `aggregateChainData()` | - |
 | 4.1-4.5 (現在価格表示) | PriceCardComponent | `fetchPriceData()` | - |
 | 5.1-5.6 (TTL キャッシュ) | CacheManager | `get()`, `set()`, `isValid()` | SWR Data Flow |
 | 6.1-6.5 (SWR パターン) | useJpycOnChainData | Hook API | SWR Data Flow |
@@ -245,9 +248,6 @@ interface DataFetcher {
   // 総供給量データを取得
   fetchTotalSupplyData(): Promise<TotalSupplyData>;
 
-  // 保有者数データを取得
-  fetchHoldersData(): Promise<HoldersData>;
-
   // すべてのデータを並列取得
   fetchAllData(): Promise<OnChainData>;
 
@@ -261,15 +261,8 @@ interface TotalSupplyData {
   decimals: number;
 }
 
-interface HoldersData {
-  total: number;
-  change24h?: number;
-  byChain: Record<SupportedChain, number>;
-}
-
 interface OnChainData {
   totalSupply: TotalSupplyData;
-  holders: HoldersData;
   timestamp: number;
 }
 ```
@@ -333,23 +326,21 @@ interface BlacklistFilter {
 
 ```typescript
 interface ChartDataAggregator {
-  // チェーン別総供給量をチャートデータに変換
+  // チェーン別総供給量をチャートデータに変換（横棒グラフ用）
+  // 最も供給量が多いチェーンを100%とした相対表示
   aggregateTotalSupplyByChain(data: TotalSupplyData): ChartData[];
-
-  // チェーン別保有者数をチャートデータに変換
-  aggregateHoldersByChain(data: HoldersData): ChartData[];
 }
 
 interface ChartData {
   name: string; // チェーン名
-  value: number; // 数値
-  percentage: number; // パーセンテージ
+  value: string; // 絶対値（フォーマット済み）
+  percentage: number; // 相対パーセンテージ（最大チェーン=100%）
 }
 ```
 
 - **Preconditions**: OnChainData が有効であること
-- **Postconditions**: Recharts PieChart に互換性のあるデータ構造を返す
-- **Invariants**: 合計が 100% になること（パーセンテージ）
+- **Postconditions**: ChainDistributionBar コンポーネントに互換性のあるデータ構造を返す
+- **Invariants**: 最も供給量が多いチェーンのパーセンテージが100%であること
 
 ---
 
@@ -387,10 +378,8 @@ interface UseOnChainDataOptions {
 interface OnChainDataResult {
   // データ
   totalSupply?: TotalSupplyData;
-  holders?: HoldersData;
   chartData?: {
     supplyByChain: ChartData[];
-    holdersByChain: ChartData[];
   };
 
   // 状態

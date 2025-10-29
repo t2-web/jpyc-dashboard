@@ -34,15 +34,11 @@ const Home: React.FC = () => {
         }
     }, []);
 
-    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, holdersCount, holdersChange, chainDistribution } = useJpycOnChainData();
+    const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, chainDistribution } = useJpycOnChainData();
     const priceState = useJpycPrice();
 
     const supplyShort = isLoading ? '読み込み中…' : totalSupplyBillions ? `¥${totalSupplyBillions}M` : '—';
     const supplyFull = isLoading ? '読み込み中…' : totalSupplyFormatted ? `${totalSupplyFormatted} JPYC` : '—';
-    const holdersLabel = isLoading ? '読み込み中…' : holdersCount ? holdersCount.toLocaleString('ja-JP') : 'Comming Soon';
-    const holdersSubtitle = holdersCount ? 'スキャン）' : 'API キーの設定が必要です';
-    const holdersChangeText = holdersCount && holdersChange !== undefined ? `${holdersChange >= 0 ? '+' : ''}${holdersChange.toLocaleString('ja-JP')} (24h)` : undefined;
-    const holdersChangeClass = holdersChangeText ? (holdersChange! >= 0 ? 'text-green-600' : 'text-red-500') : '';
 
     // 価格データの表示ロジック
     // USD価格の逆数で円建て価格を計算（1 JPYC = 1/usd JPY）
@@ -57,18 +53,20 @@ const Home: React.FC = () => {
     const priceChangeClass = priceChangeText && priceState.data ? (priceState.data.usd_24h_change >= 0 ? 'text-green-600' : 'text-red-500') : '';
     const volumeText = priceState.data ? `24h取引高: ${formatVolume(priceState.data.usd_24h_vol)}` : undefined;
 
-    // チェーン分布データの準備
-    const supplyDistributionData = chainDistribution?.map((item) => ({
-        chain: item.chain,
-        value: item.supplyFormatted,
-        percentage: item.supplyPercentage,
-    })) || [];
+    // チェーン分布データの準備（最も多いチェーンを100%とする）
+    const supplyDistributionData = (() => {
+        if (!chainDistribution || chainDistribution.length === 0) return [];
 
-    const holdersDistributionData = chainDistribution?.filter((item) => item.holdersCount !== undefined).map((item) => ({
-        chain: item.chain,
-        value: item.holdersCount!.toLocaleString('ja-JP'),
-        percentage: item.holdersPercentage ?? 0,
-    })) || [];
+        // 最大供給量を取得（BigIntの配列から）
+        const supplies = chainDistribution.map((item) => item.supply);
+        const maxSupply = supplies.reduce((max: bigint, current: bigint) => current > max ? current : max, 0n);
+
+        return chainDistribution.map((item) => ({
+            chain: item.chain,
+            value: item.supplyFormatted,
+            percentage: maxSupply > 0n ? Number((item.supply * 10000n) / maxSupply) / 100 : 0,
+        }));
+    })();
 
     return (
         <div>
@@ -99,7 +97,7 @@ const Home: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Stats Section */}
                 <section className="-mt-16 relative z-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <StatCard title="現在価格">
                             <div className="flex flex-col items-start">
                                 <p className="text-3xl font-bold tracking-tight">{priceLabel}</p>
@@ -122,13 +120,6 @@ const Home: React.FC = () => {
                              <p className="text-3xl font-bold">{supplyShort}</p>
                              <p className="text-sm text-on-surface-secondary mt-1">{supplyFull}</p>
                              {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-                        </StatCard>
-                        <StatCard title="保有者数">
-                            <p className="text-3xl font-bold">{holdersLabel}</p>
-                            <p className="text-sm text-on-surface-secondary mt-1">{holdersSubtitle}</p>
-                            {holdersChangeText && (
-                                <p className={`text-sm mt-1 ${holdersChangeClass}`}>{holdersChangeText}</p>
-                            )}
                         </StatCard>
                     </div>
                 </section>
@@ -154,11 +145,6 @@ const Home: React.FC = () => {
                                 <ChainDistributionBar
                                     title="チェーン別総供給量"
                                     data={supplyDistributionData}
-                                    isLoading={isLoading}
-                                />
-                                <ChainDistributionBar
-                                    title="チェーン別保有者数"
-                                    data={holdersDistributionData}
                                     isLoading={isLoading}
                                 />
                             </div>
