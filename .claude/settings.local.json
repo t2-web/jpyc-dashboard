@@ -1,0 +1,81 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enabledMcpjsonServers": [
+    "serena"
+  ],
+  "hooks": {
+    "session-start": [
+      "/serena-auto"
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ny/work/00_bot_list/.claude/hooks/check_and_load_knowledge.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ny/work/00_bot_list/.claude/notify_completion.sh \"作業完了・入力待ち\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ny/work/00_bot_list/.claude/notify_completion.sh \"入力を待っています\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/ny/work/00_bot_list/.claude/hooks/load_knowledge.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [[ \"$(<&0)\" =~ \"requirements\\.txt\" ]]; then bash /Users/ny/work/00_bot_list/.claude/hooks/update_requirements.sh --backup-only; fi'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if [[ \"$(<&0)\" =~ \"pip install\" ]]; then bash /Users/ny/work/00_bot_list/.claude/hooks/update_requirements.sh --force; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}

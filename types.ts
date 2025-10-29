@@ -1,7 +1,7 @@
 // Fix: Import React to use React.ReactNode type.
 import React from 'react';
 
-export type Tab = 'ホーム' | '分析' | 'DeFiエコシステム' | 'チュートリアル' | 'コミュニティ';
+export type Tab = 'ホーム' | '分析' | 'エコシステム' | 'チュートリアル' | 'セキュリティ' | 'プライバシーポリシー' | '利用規約';
 
 export interface ContractAddress {
   chain: string;
@@ -14,10 +14,17 @@ export interface DeFiProtocol {
   name: string;
   logoUrl: string;
   description: string;
-  category: 'Swap' | 'Lend' | 'Bridge' | 'Pay' | 'Donate';
+  category: 'スワップ' | 'レンディング' | 'ブリッジ' | '決済' | '寄付';
   link: string;
   tvl: string;
   apr?: string;
+}
+
+export interface EcosystemResource {
+  name: string;
+  description: string;
+  category: '公式情報' | '導入ガイド' | 'コミュニティ';
+  link: string;
 }
 
 export interface TutorialSection {
@@ -29,10 +36,31 @@ export interface TutorialSection {
   }[];
 }
 
-export interface Holder {
+export type SupportedChain = 'Ethereum' | 'Polygon' | 'Avalanche';
+
+export interface HolderAccount {
   rank: number;
   address: string;
-  quantity: string;
-  percentage: string;
-  chain: 'Ethereum' | 'Polygon' | 'Avalanche';
+  chain: SupportedChain;
+  label?: string;
+}
+
+export interface ScamContract {
+  name: string;
+  chain: string;
+  address: string;
+  reportedAt: string;
+  status: '無効化済み' | '調査中' | '注意喚起';
+  note?: string;
+}
+
+export interface CoinGeckoPriceData {
+  usd: number;
+  usd_market_cap: number;
+  usd_24h_vol: number;
+  usd_24h_change: number;
+}
+
+export interface CoinGeckoResponse {
+  jpycoin: CoinGeckoPriceData;
 }

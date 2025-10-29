@@ -9,8 +9,8 @@ const Analytics: React.FC = () => {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-3xl font-bold text-on-surface mb-2">Data & Analytics</h1>
-        <p className="text-on-surface-secondary">Explore on-chain data, price history, and more.</p>
+        <h1 className="text-3xl font-bold text-on-surface mb-2">データと分析</h1>
+        <p className="text-on-surface-secondary">オンチェーン指標や価格推移など、JPYC の最新データを確認できます。</p>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -18,29 +18,31 @@ const Analytics: React.FC = () => {
           data={priceChartData} 
           xAxisKey="name" 
           lines={[{ key: 'price', color: '#00BCD4' }, { key: 'volume', color: '#FFC107' }]} 
-          title="Price & Volume (USD)" 
+          title="価格と出来高 (USD)" 
+          comingSoon
         />
         <CustomLineChart 
           data={holderChartData} 
           xAxisKey="name" 
           lines={[{ key: 'holders', color: '#8884d8' }]}
-          title="Holder Growth"
+          title="保有者推移"
+          comingSoon
         />
       </section>
       
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
             <Card>
-                <h2 className="text-xl font-semibold mb-4 text-on-surface">DEX Information</h2>
+                <h2 className="text-xl font-semibold mb-4 text-on-surface">DEX情報</h2>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
                             <tr className="border-b border-border">
                                 <th className="p-3">DEX</th>
-                                <th className="p-3">Chain</th>
-                                <th className="p-3">Price (USDC)</th>
-                                <th className="p-3">Volume (24h)</th>
-                                <th className="p-3">Liquidity</th>
+                                <th className="p-3">チェーン</th>
+                                <th className="p-3">価格 (USDC)</th>
+                                <th className="p-3">取引高 (24h)</th>
+                                <th className="p-3">流動性</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -75,7 +77,7 @@ const Analytics: React.FC = () => {
       
       <section>
         <Card>
-            <h2 className="text-xl font-semibold mb-4 text-on-surface">Key Contract Addresses</h2>
+            <h2 className="text-xl font-semibold mb-4 text-on-surface">主要コントラクトアドレス</h2>
             <div className="space-y-3">
                 {CONTRACT_ADDRESSES.map(ca => (
                     <div key={ca.chain} className="bg-background p-3 rounded-lg flex flex-wrap items-center justify-between gap-2">
