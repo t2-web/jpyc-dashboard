@@ -14,26 +14,23 @@ export const ANNOUNCEMENTS = [
 ];
 //TODO: Update with real logoUrl
 export const DEFI_PROTOCOLS: DeFiProtocol[] = [
-    { name: 'Uniswap', logoUrl: 'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png?1696512319', description: 'JPYC ペアへ流動性を提供し、取引手数料を獲得できます。', category: 'スワップ', link: '#', tvl: '4.2B' },
-    { name: 'KyberSwap', logoUrl: 'https://assets.coingecko.com/markets/images/678/small/kyberswap-dex.png?1695156333', description: '複数チェーンで JPYC と他通貨をシームレスにスワップできます。', category: 'スワップ', link: '#', tvl: '150M' },
-    { name: 'Aave', logoUrl: 'https://assets.coingecko.com/coins/images/12645/small/AAVE.png?1696512361', description: 'JPYC を預け入れて利息を得たり、担保にして借入ができます。', category: 'レンディング', link: '#', tvl: '12.5B', apr: '2.5%' },
-    { name: 'Moonwell', logoUrl: 'https://assets.coingecko.com/coins/images/26452/small/Mark_200x200.png?1658129113', description: 'Base と Moonbeam 上で利用できるレンディング／ボローイングプロトコルです。', category: 'レンディング', link: '#', tvl: '300M', apr: '3.1%' },
-    { name: 'Stargate', logoUrl: 'https://assets.coingecko.com/coins/images/24413/small/STG_LOGO.png?1647654518', description: '統一流動性を使って JPYC を異なるブロックチェーン間でブリッジ。', category: 'ブリッジ', link: '#', tvl: '500M' },
-    { name: 'Gitcoin', logoUrl: 'https://assets.coingecko.com/coins/images/731/small/gitcoin.png?1656678724', description: 'JPYC でお気に入りの OSS プロジェクトに寄付できます。', category: '寄付', link: '#', tvl: 'N/A' },
+    { name: 'Uniswap', logoUrl: 'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png?1696512319', description: 'JPYC から他の通貨へSwapを行う。または流動性を提供し、取引手数料を獲得できます。', category: 'スワップ', link: 'https://app.uniswap.org/swap?chain=mainnet&inputCurrency=0xe7c3d8c9a439fede00d2600032d5db0be71c3c29&outputCurrency=0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48&field=input'},
+    { name: 'Aave', logoUrl: 'https://assets.coingecko.com/coins/images/12645/small/AAVE.png?1696512361', description: 'JPYC を預け入れて利息を得たり、担保にして借入ができます。', category: 'レンディング', link: '#'},
+    { name: 'Stargate', logoUrl: 'https://assets.coingecko.com/coins/images/24413/small/STG_LOGO.png?1647654518', description: '統一流動性を使って JPYC を異なるブロックチェーン間でブリッジ。', category: 'ブリッジ', link: '#'},
 ];
 
 export const ECOSYSTEM_RESOURCES: EcosystemResource[] = [
     {
-        name: 'JPYCの発行と償還',
-        description: 'JPYC の発行・償還プロセスや仕組みを詳しく解説した公式ページです。',
-        category: '公式情報',
-        link: 'https://jpyc.co.jp/about/',
-    },
-    {
-        name: 'JPYC公式',
+        name: 'JPYC公式ホームページ',
         description: 'JPYC株式会社の公式コーポレートサイト。各種ポリシーや会社情報を確認できます。',
         category: '公式情報',
         link: 'https://corporate.jpyc.co.jp/',
+    },
+    {
+        name: 'JPYCの発行と償還',
+        description: 'JPYC の発行・償還プロセスや仕組みを詳しく解説した公式ページです。',
+        category: '公式情報',
+        link: 'https://jpyc.co.jp/',
     },
     {
         name: 'JPYCブログ',

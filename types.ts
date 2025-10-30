@@ -16,8 +16,6 @@ export interface DeFiProtocol {
   description: string;
   category: 'スワップ' | 'レンディング' | 'ブリッジ' | '決済' | '寄付';
   link: string;
-  tvl: string;
-  apr?: string;
 }
 
 export interface EcosystemResource {
