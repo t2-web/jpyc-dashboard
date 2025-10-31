@@ -1,3 +1,13 @@
+/**
+ * 主要コントラクトアドレス
+ * JPYC トークンコントラクトの公式アドレス一覧
+ */
+export const JPYC_CONTRACT_ADDRESSES = {
+  Ethereum: '0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29',
+  Polygon: '0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29',
+  Avalanche: '0xE7C3D8C9a439feDe00D2600032D5dB0Be71C3c29',
+} as const;
+
 const FUNCTION_SIG = {
   totalSupply: '0x18160ddd',
   decimals: '0x313ce567',
@@ -8,7 +18,7 @@ const ALCHEMY_API_KEY = import.meta.env.VITE_ALCHEMY_API_KEY;
 
 const DEFAULT_RPC: Record<string, string> = {
   Ethereum: import.meta.env.VITE_ETHEREUM_RPC_URL ?? (ALCHEMY_API_KEY ? `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://rpc.ankr.com/eth'),
-  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? (ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://polygon.llamarpc.com'),
+  Polygon: import.meta.env.VITE_POLYGON_RPC_URL ?? (ALCHEMY_API_KEY ? `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://polygon.drpc.org'),
   Avalanche: import.meta.env.VITE_AVALANCHE_RPC_URL ?? (ALCHEMY_API_KEY ? `https://avax-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : 'https://avalanche.public-rpc.com'),
 };
 

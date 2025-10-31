@@ -97,64 +97,8 @@ async function fetchOnChainState(): Promise<OnChainState> {
         throw new Error('Ethereum の公式コントラクト情報が見つかりません');
       }
 
-      const [totalSupplyHex, decimals] = await Promise.all([
-        callErc20TotalSupply('Ethereum', ethereumContract.address),
-        callErc20Decimals('Ethereum', ethereumContract.address),
-      ]);
-      const totalSupplyRawBeforeBlacklist = hexToBigInt(totalSupplyHex);
-
-      // Ethereumチェーンのブラックリスト保有量を取得
-      console.log('🔍 [Ethereum Supply] Fetching blacklist balances for Ethereum...');
-      const ethereumBlacklistBalance = await fetchTotalBlacklistBalance('Ethereum', ethereumContract.address);
-      const totalSupplyRaw = totalSupplyRawBeforeBlacklist - ethereumBlacklistBalance;
-
-      console.log('📊 [Ethereum Supply] Adjustment:', {
-        rawSupply: totalSupplyRawBeforeBlacklist.toString(),
-        blacklisted: ethereumBlacklistBalance.toString(),
-        adjusted: totalSupplyRaw.toString(),
-        rawFormatted: formatTokenAmount(totalSupplyRawBeforeBlacklist, decimals, 2),
-        blacklistedFormatted: formatTokenAmount(ethereumBlacklistBalance, decimals, 2),
-        adjustedFormatted: formatTokenAmount(totalSupplyRaw, decimals, 2),
-      });
-
-      const totalSupplyFormatted = formatTokenAmount(totalSupplyRaw, decimals, 2);
-      const totalSupplyBillions = formatBillions(totalSupplyRaw, decimals);
-
-      // 実際の値をログ出力
-      console.log('📊 [OnChain Data] Total Supply (After Blacklist):', {
-        raw: totalSupplyRaw.toString(),
-        formatted: totalSupplyFormatted,
-        billions: totalSupplyBillions,
-        decimals,
-      });
-
-      const holders = await Promise.all(
-        HOLDER_ACCOUNTS.map(async (holder) => {
-          const chainContract = CONTRACT_ADDRESSES.find((c) => c.chain === holder.chain);
-          if (!chainContract) {
-            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
-          }
-
-          try {
-            const balanceHex = await callErc20Balance(holder.chain as ChainKey, chainContract.address, holder.address);
-            const balanceRaw = hexToBigInt(balanceHex);
-            return {
-              ...holder,
-              balanceRaw,
-              quantity: formatTokenAmount(balanceRaw, decimals, 2),
-              percentage: formatPercentage(balanceRaw, totalSupplyRaw),
-            };
-          } catch (err) {
-            console.warn('Balance fetch failed', holder.address, err);
-            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
-          }
-        })
-      );
-
-      const filtered = holders
-        .filter((holder) => holder.balanceRaw > 0n)
-        .sort((a, b) => (b.balanceRaw > a.balanceRaw ? 1 : -1))
-        .map((holder, index) => ({ ...holder, rank: index + 1 }));
+      // decimalsを取得（全チェーンで同じと仮定）
+      const decimals = await callErc20Decimals('Ethereum', ethereumContract.address);
 
       // 各チェーンの総供給量を取得（RPCのみ使用）
       console.log('📊 [Chain Supply] Starting supply fetch for all chains...');
@@ -199,7 +143,51 @@ async function fetchOnChainState(): Promise<OnChainState> {
         }
       }
 
-      // chainDistributionを作成
+      // 全チェーンの総供給量を合計
+      const totalSupplyRaw = Array.from(chainSupplyMap.values()).reduce((sum, supply) => sum + supply, 0n);
+
+      console.log('📊 [Total Supply] All Chains Combined:', {
+        raw: totalSupplyRaw.toString(),
+        formatted: formatTokenAmount(totalSupplyRaw, decimals, 2),
+        chains: Array.from(chainSupplyMap.entries()).map(([chain, supply]) => ({
+          chain,
+          supply: supply.toString(),
+          formatted: formatTokenAmount(supply, decimals, 2),
+        })),
+      });
+
+      const totalSupplyFormatted = formatTokenAmount(totalSupplyRaw, decimals, 2);
+      const totalSupplyBillions = formatBillions(totalSupplyRaw, decimals);
+
+      const holders = await Promise.all(
+        HOLDER_ACCOUNTS.map(async (holder) => {
+          const chainContract = CONTRACT_ADDRESSES.find((c) => c.chain === holder.chain);
+          if (!chainContract) {
+            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
+          }
+
+          try {
+            const balanceHex = await callErc20Balance(holder.chain as ChainKey, chainContract.address, holder.address);
+            const balanceRaw = hexToBigInt(balanceHex);
+            return {
+              ...holder,
+              balanceRaw,
+              quantity: formatTokenAmount(balanceRaw, decimals, 2),
+              percentage: formatPercentage(balanceRaw, totalSupplyRaw),
+            };
+          } catch (err) {
+            console.warn('Balance fetch failed', holder.address, err);
+            return { ...holder, balanceRaw: 0n, quantity: '0', percentage: '0.00' };
+          }
+        })
+      );
+
+      const filtered = holders
+        .filter((holder) => holder.balanceRaw > 0n)
+        .sort((a, b) => (b.balanceRaw > a.balanceRaw ? 1 : -1))
+        .map((holder, index) => ({ ...holder, rank: index + 1 }));
+
+      // chainDistributionを作成（既に取得済みのchainSupplyMapを使用）
       const chainDistribution: ChainDistribution[] = Array.from(chainSupplyMap.entries()).map(([chain, supply]) => {
         const supplyPercentage = totalSupplyRaw > 0n ? Number((supply * 10000n) / totalSupplyRaw) / 100 : 0;
 

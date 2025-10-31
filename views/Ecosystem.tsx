@@ -25,10 +25,6 @@ const Ecosystem: React.FC = () => {
                 </div>
               </div>
               <p className="text-on-surface-secondary flex-grow">{protocol.description}</p>
-              <div className="mt-4 pt-4 border-t border-border text-sm text-on-surface-secondary space-y-1">
-                  <div className="flex justify-between"><span>TVL:</span><span className="font-bold text-on-surface">${protocol.tvl}</span></div>
-                  {protocol.apr && <div className="flex justify-between"><span>APR:</span><span className="font-bold text-green-400">{protocol.apr}</span></div>}
-              </div>
               <a href={protocol.link} target="_blank" rel="noopener noreferrer" className="w-full text-center bg-primary text-white font-bold py-2 rounded-lg mt-6 hover:bg-primary-hover transition-colors flex items-center justify-center gap-2">
                 詳細を見る <ExternalLinkIcon />
               </a>
