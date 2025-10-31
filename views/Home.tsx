@@ -13,26 +13,50 @@ import { JPYC_CONTRACT_ADDRESSES } from '../lib/onchain';
 const Home: React.FC = () => {
     // Twitter Widgetを初期化
     useEffect(() => {
-        // Twitterのウィジェットスクリプトが読み込まれているか確認
-        if ((window as any).twttr?.widgets) {
-            console.log('🐦 [Twitter Widget] Loading widgets...');
-            (window as any).twttr.widgets.load();
-        } else {
-            // スクリプトが読み込まれていない場合は、読み込み完了を待つ
-            const checkTwitterScript = setInterval(() => {
-                if ((window as any).twttr?.widgets) {
-                    console.log('🐦 [Twitter Widget] Script loaded, initializing widgets...');
-                    (window as any).twttr.widgets.load();
-                    clearInterval(checkTwitterScript);
-                }
-            }, 100);
+        let mounted = true;
+        let checkInterval: NodeJS.Timeout | null = null;
+        let timeoutId: NodeJS.Timeout | null = null;
 
-            // 10秒後にタイムアウト
-            setTimeout(() => {
-                clearInterval(checkTwitterScript);
-                console.warn('⚠️ [Twitter Widget] Script loading timeout');
-            }, 10000);
-        }
+        const loadTwitterWidgets = () => {
+            if (!mounted) return;
+
+            if ((window as any).twttr?.widgets) {
+                console.log('🐦 [Twitter Widget] Loading widgets...');
+                (window as any).twttr.widgets.load();
+            } else {
+                // スクリプトが読み込まれていない場合は、読み込み完了を待つ
+                checkInterval = setInterval(() => {
+                    if (!mounted) {
+                        if (checkInterval) clearInterval(checkInterval);
+                        return;
+                    }
+
+                    if ((window as any).twttr?.widgets) {
+                        console.log('🐦 [Twitter Widget] Script loaded, initializing widgets...');
+                        (window as any).twttr.widgets.load();
+                        if (checkInterval) clearInterval(checkInterval);
+                    }
+                }, 100);
+
+                // 10秒後にタイムアウト
+                timeoutId = setTimeout(() => {
+                    if (checkInterval) clearInterval(checkInterval);
+                    if (mounted) {
+                        console.warn('⚠️ [Twitter Widget] Script loading timeout');
+                    }
+                }, 10000);
+            }
+        };
+
+        // 少し遅延させて実行（DOMの準備完了を確実にする）
+        const initTimeout = setTimeout(loadTwitterWidgets, 500);
+
+        return () => {
+            mounted = false;
+            clearTimeout(initTimeout);
+            if (checkInterval) clearInterval(checkInterval);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
     }, []);
 
     const { isLoading, error, totalSupplyFormatted, totalSupplyBillions, chainDistribution } = useJpycOnChainData();
@@ -162,13 +186,13 @@ const Home: React.FC = () => {
                         {/* X (Twitter) Timeline */}
                         <div>
                              <h2 className="text-2xl font-bold mb-6">最新情報</h2>
-                             <Card className="h-[600px] overflow-hidden">
+                             <Card className="h-[600px]">
                                 <a
                                     className="twitter-timeline"
                                     data-height="600"
                                     data-theme="light"
                                     data-chrome="noheader nofooter noborders"
-                                    href="https://x.com/jpyc_official?ref_src=twsrc%5Etfw"
+                                    href="https://twitter.com/jpyc_official?ref_src=twsrc%5Etfw"
                                 >
                                     Tweets by jpyc_official
                                 </a>
